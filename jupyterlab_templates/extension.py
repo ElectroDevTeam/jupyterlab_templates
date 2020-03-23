@@ -14,7 +14,7 @@ class TemplatesLoader():
     def __init__(self, template_dirs):
         self.template_dirs = template_dirs
 
-    def get_templates(self):
+    def get_templates(self, username='anonymous'):
         templates = {}
 
         for path in self.template_dirs:
@@ -33,7 +33,9 @@ class TemplatesLoader():
             for f, dirname, filename in files:
                 with open(os.path.join(abspath, f), 'r', encoding='utf8') as fp:
                     content = fp.read()
-                templates[os.path.join(dirname, filename)] = {'path': f, 'dirname': dirname, 'filename': filename, 'content': content}
+                templates[os.path.join(dirname, filename)] = {'path': f, 'dirname': dirname, 'filename': filename,
+                                                              'content': content.replace("##username##", username),
+                                                              }
 
         return templates
 
@@ -45,7 +47,7 @@ class TemplatesHandler(IPythonHandler):
     def get(self):
         temp = self.get_argument('template', '')
         if temp:
-            self.finish(self.loader.get_templates()[temp])
+            self.finish(self.loader.get_templates(username(self))[temp])
         else:
             self.set_status(404)
 
@@ -55,8 +57,15 @@ class TemplateNamesHandler(IPythonHandler):
         self.loader = loader
 
     def get(self):
-        template_names = self.loader.get_templates().keys()
+        template_names = self.loader.get_templates(username(self)).keys()
         self.finish(json.dumps(sorted(template_names)))
+
+
+def username(web_handler):
+    data = web_handler.get_current_user()
+    if data == 'anonymous':
+        return data
+    return data['name']
 
 
 def load_jupyter_server_extension(nb_server_app):
@@ -84,5 +93,7 @@ def load_jupyter_server_extension(nb_server_app):
     loader = TemplatesLoader(template_dirs)
     print('Available templates:\n\t%s' % '\n\t'.join(t for t in loader.get_templates()))
 
-    web_app.add_handlers(host_pattern, [(url_path_join(base_url, 'templates/names'), TemplateNamesHandler, {'loader': loader})])
-    web_app.add_handlers(host_pattern, [(url_path_join(base_url, 'templates/get'), TemplatesHandler, {'loader': loader})])
+    web_app.add_handlers(host_pattern,
+                         [(url_path_join(base_url, 'templates/names'), TemplateNamesHandler, {'loader': loader})])
+    web_app.add_handlers(host_pattern,
+                         [(url_path_join(base_url, 'templates/get'), TemplatesHandler, {'loader': loader})])
