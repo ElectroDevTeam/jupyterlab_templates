@@ -12,7 +12,12 @@ import {
 
 import {
     IDocumentManager,
+
 } from "@jupyterlab/docmanager";
+
+import {
+    Contents
+} from '@jupyterlab/services';
 
 import {
     IFileBrowserFactory,
@@ -79,6 +84,32 @@ export class OpenTemplateWidget extends Widget {
     }
 }
 
+function formatNotebookName(path: string, data: { [key: string]: string }, number?: number): string {
+    return path.replace(
+        /Untitled[0-9]*\.ipynb/gi,
+        data.filename.replace(/\.ipynb/gi, '')
+        + (number ? number.toString() : "") + " - " + data.username + ".ipynb")
+}
+
+function _renameTemplate(docManager: IDocumentManager,
+                         path: string,
+                         data: { [key: string]: string },
+                         resolve: (model: void | Contents.IModel) => void,
+                         tryNumber: number): Promise<void | Contents.IModel> {
+    return docManager.rename(path, formatNotebookName(path, data, tryNumber))
+        .then(resolve)
+        .catch(() => _renameTemplate(docManager, path, data, resolve, tryNumber + 1));
+}
+
+function renameTemplate(docManager: IDocumentManager,
+                        path: string,
+                        data: { [key: string]: string },
+                        resolve: (model: void | Contents.IModel) => void): Promise<void | Contents.IModel> {
+    return docManager.rename(path, formatNotebookName(path, data))
+        .then(resolve)
+        .catch(() => _renameTemplate(docManager, path, data, resolve, 1));
+}
+
 function activate(app: JupyterFrontEnd,
                   docManager: IDocumentManager,
                   palette: ICommandPalette,
@@ -113,22 +144,27 @@ function activate(app: JupyterFrontEnd,
                                     PageConfig.getBaseUrl() + "templates/get",
                                     {template: result.value},
                                 ).then((res2: IRequestResult) => {
-                                    const data = res2.json() as { [key: string]: [string] };
+                                    const data = res2.json() as { [key: string]: string };
                                     const path = browser.defaultBrowser.model.path;
 
                                     return new Promise((resolve) => {
-                                        app.commands.execute(
-                                            "docmanager:new-untitled", {path, type: "notebook"},
-                                        ).then((model) => {
-                                            app.commands.execute("docmanager:open", {
-                                                factory: "Notebook", path: model.path,
-                                            }).then((widget) => {
-                                                widget.context.ready.then(() => {
-                                                    widget.model.fromString(data.content);
-                                                    resolve(widget);
-                                                });
+                                        app.commands.execute("docmanager:new-untitled", {path, type: "notebook"})
+                                            .then(model => {
+                                                renameTemplate(
+                                                    docManager,
+                                                    model.path,
+                                                    data,
+                                                    (model: Contents.IModel) => {
+                                                        app.commands.execute("docmanager:open", {
+                                                            factory: "Notebook", path: model.path,
+                                                        }).then((widget) => {
+                                                            widget.context.ready.then(() => {
+                                                                widget.model.fromString(data.content);
+                                                                resolve(widget);
+                                                            });
+                                                        });
+                                                    });
                                             });
-                                        });
                                     });
                                 });
                             }

@@ -35,7 +35,7 @@ class TemplatesLoader():
                     content = fp.read()
                 templates[os.path.join(dirname, filename)] = {'path': f, 'dirname': dirname, 'filename': filename,
                                                               'content': content.replace("##username##", username),
-                                                              }
+                                                              'username': username}
 
         return templates
 
