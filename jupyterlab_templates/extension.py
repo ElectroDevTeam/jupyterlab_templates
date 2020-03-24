@@ -9,12 +9,15 @@ import jupyter_core.paths
 from notebook.base.handlers import IPythonHandler
 from notebook.utils import url_path_join
 
+DEFAULT_USERNAME = "anonymous"
+USERNAME_TEMPLATE = "##username##"
+
 
 class TemplatesLoader():
     def __init__(self, template_dirs):
         self.template_dirs = template_dirs
 
-    def get_templates(self, username='anonymous'):
+    def get_templates(self, username=DEFAULT_USERNAME):
         templates = {}
 
         for path in self.template_dirs:
@@ -34,7 +37,7 @@ class TemplatesLoader():
                 with open(os.path.join(abspath, f), 'r', encoding='utf8') as fp:
                     content = fp.read()
                 templates[os.path.join(dirname, filename)] = {'path': f, 'dirname': dirname, 'filename': filename,
-                                                              'content': content.replace("##username##", username),
+                                                              'content': content.replace(USERNAME_TEMPLATE, username),
                                                               'username': username}
 
         return templates
@@ -47,7 +50,7 @@ class TemplatesHandler(IPythonHandler):
     def get(self):
         temp = self.get_argument('template', '')
         if temp:
-            self.finish(self.loader.get_templates(username(self))[temp])
+            self.finish(self.loader.get_templates(get_username(self))[temp])
         else:
             self.set_status(404)
 
@@ -57,13 +60,13 @@ class TemplateNamesHandler(IPythonHandler):
         self.loader = loader
 
     def get(self):
-        template_names = self.loader.get_templates(username(self)).keys()
+        template_names = self.loader.get_templates(get_username(self)).keys()
         self.finish(json.dumps(sorted(template_names)))
 
 
-def username(web_handler):
+def get_username(web_handler):
     data = web_handler.get_current_user()
-    if data == 'anonymous':
+    if data == DEFAULT_USERNAME:
         return data
     return data['name']
 
