@@ -2,15 +2,22 @@ import fnmatch
 import json
 import os
 import os.path
-from io import open
-
 import jupyter_core.paths
 
-from notebook.base.handlers import IPythonHandler
+from io import open
+from datetime import datetime
 from notebook.utils import url_path_join
+from notebook.base.handlers import IPythonHandler
 
+DATE_FORMAT = "%Y-%m-%d"
+TIME_FORMAT = "%H:%M:%S"
 DEFAULT_USERNAME = "anonymous"
 USERNAME_TEMPLATE = "##username##"
+TEMPLATES_TO_FUNCTION = {
+    "##DATETIME##": lambda: datetime.now().strftime(DATE_FORMAT + " " + TIME_FORMAT),
+    "##DATE##": lambda: datetime.now().strftime(DATE_FORMAT),
+    "##TIME##": lambda: datetime.now().strftime(TIME_FORMAT),
+}
 
 
 class TemplatesLoader():
@@ -26,8 +33,8 @@ class TemplatesLoader():
             files = []
             # get all files in subdirectories
             for dirname, dirnames, filenames in os.walk(path):
-                if dirname == path:
-                    # Skip top level
+                if dirname.startswith("."):
+                    # Skip hidden paths
                     continue
                 for filename in fnmatch.filter(filenames, '*.ipynb'):
                     if '.ipynb_checkpoints' not in dirname:
@@ -36,11 +43,20 @@ class TemplatesLoader():
             for f, dirname, filename in files:
                 with open(os.path.join(abspath, f), 'r', encoding='utf8') as fp:
                     content = fp.read()
-                templates[os.path.join(dirname, filename)] = {'path': f, 'dirname': dirname, 'filename': filename,
-                                                              'content': content.replace(USERNAME_TEMPLATE, username),
+                templates[os.path.join(dirname, filename)] = {'path': f,
+                                                              'dirname': dirname,
+                                                              'filename': filename,
+                                                              'content': format_content(content, username),
                                                               'username': username}
 
         return templates
+
+
+def format_content(content, username):
+    formatted_content = content.replace(USERNAME_TEMPLATE, username)
+    for pattern, func in TEMPLATES_TO_FUNCTION.items():
+        formatted_content = formatted_content.replace(pattern, func())
+    return formatted_content
 
 
 class TemplatesHandler(IPythonHandler):
