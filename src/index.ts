@@ -138,36 +138,31 @@ function activate(app: JupyterFrontEnd,
                 title: "Template",
             }).then((result) => {
                 if (result.button.label === "Cancel") {
-                    return;
+                    return
                 }
                 if (result.value) {
-                    request("get",
-                        PageConfig.getBaseUrl() + "templates/get",
-                        {template: result.value},
-                    ).then((res2: IRequestResult) => {
-                        const data = res2.json() as { [key: string]: string };
-                        const path = browser.defaultBrowser.model.path;
-
-                        return new Promise((resolve) => {
-                            app.commands.execute("docmanager:new-untitled", {path, type: "notebook"})
-                                .then(model => {
-                                    renameTemplate(
-                                        docManager,
-                                        model.path,
-                                        data,
-                                        (model: Contents.IModel) => {
-                                            app.commands.execute("docmanager:open", {
-                                                factory: "Notebook", path: model.path,
-                                            }).then((widget) => {
-                                                widget.context.ready.then(() => {
-                                                    widget.model.fromString(data.content);
-                                                    resolve(widget);
+                    request("get", PageConfig.getBaseUrl() + "templates/get", {template: result.value})
+                        .then((res2: IRequestResult) => {
+                            const data = res2.json() as { [key: string]: string };
+                            const path = browser.defaultBrowser.model.path;
+                            return new Promise((resolve) => {
+                                app.commands.execute("docmanager:new-untitled", {path, type: "notebook"})
+                                    .then(model => {
+                                        renameTemplate(docManager, model.path, data,
+                                            (model: Contents.IModel) => {
+                                                app.commands.execute("docmanager:open", {
+                                                    factory: "Notebook", path: model.path,
+                                                }).then((widget) => {
+                                                    widget.context.ready.then(() => {
+                                                        widget.model.fromString(data.content);
+                                                        resolve(widget);
+                                                    });
                                                 });
-                                            });
-                                        });
-                                });
+                                            }
+                                        );
+                                    });
+                            });
                         });
-                    });;
                 }
             });
         },
