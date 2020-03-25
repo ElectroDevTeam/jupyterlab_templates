@@ -14,9 +14,9 @@ TIME_FORMAT = "%H:%M:%S"
 DEFAULT_USERNAME = "anonymous"
 USERNAME_TEMPLATE = "##username##"
 TEMPLATES_TO_FUNCTION = {
-    "##DATETIME##": lambda: datetime.now().strftime(DATE_FORMAT + " " + TIME_FORMAT),
-    "##DATE##": lambda: datetime.now().strftime(DATE_FORMAT),
-    "##TIME##": lambda: datetime.now().strftime(TIME_FORMAT),
+    "##datetime##": lambda: datetime.now().strftime(DATE_FORMAT + " " + TIME_FORMAT),
+    "##date##": lambda: datetime.now().strftime(DATE_FORMAT),
+    "##time##": lambda: datetime.now().strftime(TIME_FORMAT),
 }
 
 
