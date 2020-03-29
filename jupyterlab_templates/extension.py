@@ -80,11 +80,25 @@ class TemplateNamesHandler(IPythonHandler):
         self.finish(json.dumps(sorted(template_names)))
 
 
+class TemplateTotorialPathHandler(IPythonHandler):
+    def initialize(self, totorial_path):
+        self.totorial_path = totorial_path
+
+    def get(self):
+        self.finish(json.dumps(self.totorial_path))
+
+
 def get_username(web_handler):
     data = web_handler.get_current_user()
     if data == DEFAULT_USERNAME:
         return data
     return data['name']
+
+
+def convert_template_to_relative_path(absolute_path, root_dirs):
+    for root_dir in root_dirs:
+        if os.path.commonpath([absolute_path, root_dir]) == root_dir:
+            return absolute_path[len(root_dir) + 1:]
 
 
 def load_jupyter_server_extension(nb_server_app):
@@ -96,6 +110,7 @@ def load_jupyter_server_extension(nb_server_app):
     """
     web_app = nb_server_app.web_app
     template_dirs = nb_server_app.config.get('JupyterLabTemplates', {}).get('template_dirs', [])
+    totorial_path = nb_server_app.config.get('JupyterLabTemplates', {}).get('totorial_path')
 
     if nb_server_app.config.get('JupyterLabTemplates', {}).get('include_default', True):
         template_dirs.append(os.path.join(os.path.dirname(__file__), 'templates'))
@@ -116,3 +131,7 @@ def load_jupyter_server_extension(nb_server_app):
                          [(url_path_join(base_url, 'templates/names'), TemplateNamesHandler, {'loader': loader})])
     web_app.add_handlers(host_pattern,
                          [(url_path_join(base_url, 'templates/get'), TemplatesHandler, {'loader': loader})])
+    web_app.add_handlers(host_pattern,
+                         [(url_path_join(base_url, 'templates/get_totorial_path'), TemplateTotorialPathHandler,
+                           {'totorial_path': (convert_template_to_relative_path(totorial_path, template_dirs)
+                                              if totorial_path else None)})])

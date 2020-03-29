@@ -116,6 +116,34 @@ function renameTemplate(docManager: IDocumentManager,
         .catch(() => _renameTemplate(docManager, path, data, resolve, 1));
 }
 
+;function load_template(app: JupyterFrontEnd,
+                       docManager: IDocumentManager,
+                       browser: IFileBrowserFactory,
+                       template_name: string): Promise<any> {
+    return request("get", PageConfig.getBaseUrl() + "templates/get", {template: template_name})
+        .then((res2: IRequestResult) => {
+            const data = res2.json() as { [key: string]: string };
+            const path = browser.defaultBrowser.model.path;
+            return new Promise((resolve) => {
+                app.commands.execute("docmanager:new-untitled", {path, type: "notebook"})
+                    .then(model => {
+                        renameTemplate(docManager, model.path, data,
+                            (model: Contents.IModel) => {
+                                app.commands.execute("docmanager:open", {
+                                    factory: "Notebook", path: model.path,
+                                }).then((widget) => {
+                                    widget.context.ready.then(() => {
+                                        widget.model.fromString(data.content);
+                                        resolve(widget);
+                                    });
+                                });
+                            }
+                        );
+                    });
+            });
+        });
+}
+
 function activate(app: JupyterFrontEnd,
                   docManager: IDocumentManager,
                   palette: ICommandPalette,
@@ -127,6 +155,7 @@ function activate(app: JupyterFrontEnd,
 
     // Add an application command
     const open_command = "template:open";
+    const open_tutorial_command = "template:open-tutorial";
 
     app.commands.addCommand(open_command, {
         caption: "Initialize a notebook from a template notebook",
@@ -141,28 +170,7 @@ function activate(app: JupyterFrontEnd,
                     return
                 }
                 if (result.value) {
-                    request("get", PageConfig.getBaseUrl() + "templates/get", {template: result.value})
-                        .then((res2: IRequestResult) => {
-                            const data = res2.json() as { [key: string]: string };
-                            const path = browser.defaultBrowser.model.path;
-                            return new Promise((resolve) => {
-                                app.commands.execute("docmanager:new-untitled", {path, type: "notebook"})
-                                    .then(model => {
-                                        renameTemplate(docManager, model.path, data,
-                                            (model: Contents.IModel) => {
-                                                app.commands.execute("docmanager:open", {
-                                                    factory: "Notebook", path: model.path,
-                                                }).then((widget) => {
-                                                    widget.context.ready.then(() => {
-                                                        widget.model.fromString(data.content);
-                                                        resolve(widget);
-                                                    });
-                                                });
-                                            }
-                                        );
-                                    });
-                            });
-                        });
+                    load_template(app, docManager, browser, result.value);
                 }
             });
         },
@@ -188,6 +196,31 @@ function activate(app: JupyterFrontEnd,
         menu.fileMenu.newMenu.addGroup([{command: open_command}], 40);
     }
 
+    request("get", PageConfig.getBaseUrl() + "templates/get_totorial_path").then((res: IRequestResult) => {
+        if (res.ok) {
+            const totorialPath = res.json() as string;
+            if (totorialPath != null) {
+                app.commands.addCommand(open_tutorial_command, {
+                    caption: "Initialize a tutorial notebook from a template notebook",
+                    execute: (args) => load_template(app, docManager, browser, totorialPath),
+                    iconClass: "jp-TemplateIcon",
+                    isEnabled: () => true,
+                    label: "Tutorial",
+                });
+                if (launcher) {
+                    launcher.add({
+                        args: {isLauncher: true, kernelName: "Tutorial"},
+                        category: "Notebook",
+                        command: open_tutorial_command,
+                        // tslint:disable-next-line: max-line-length
+                        kernelIconUrl: "data:image/png;base64,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",
+                        rank: 1,
+                    });
+                }
+
+            }
+        }
+    });
     // tslint:disable-next-line: no-console
     console.log("JupyterLab extension jupyterlab_templates is activated!");
 }
